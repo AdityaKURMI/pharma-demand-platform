@@ -1,2 +1,4 @@
-# Data folder
+__pycache__/
+*.pyc
 data/
+.env
