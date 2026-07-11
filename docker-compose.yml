@@ -1,0 +1,31 @@
+# Local Airflow for the pharma-demand-platform.
+#
+# Run:    docker compose up
+# UI:     http://localhost:8080
+# Login:  user "admin" — password is auto-generated; find it in the container
+#         logs (look for "Password for user 'admin'") or in the file
+#         simple_auth_manager_passwords.json.generated inside the container.
+#
+# Notes:
+# - "standalone" mode runs scheduler + webserver + a local DB in one
+#   container. Perfect for dev; NOT for production (we'd split services
+#   and use Postgres there — good interview talking point).
+# - The whole repo is mounted at /opt/airflow/repo, so the DAG can run
+#   your existing scripts unchanged, and data/ persists on your Windows disk.
+# - _PIP_ADDITIONAL_REQUIREMENTS installs deps at container start. Fine for
+#   dev; production would bake a custom image (another talking point).
+
+services:
+  airflow:
+    image: apache/airflow:3.0.2
+    container_name: pharma-airflow
+    command: standalone
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      _PIP_ADDITIONAL_REQUIREMENTS: "requests pandas duckdb pyarrow"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./:/opt/airflow/repo
+    restart: unless-stopped
