@@ -63,3 +63,46 @@ Q3 ≈ 19.0M, Q4 ≈ 19.2M prescriptions) — only the payment pipe changed.
 → Implication: forecast total demand (FFS + MCO combined) per drug per
    state; single-channel series contain policy-driven regime changes that
    would look like fake demand shocks to a model.
+
+## 9. Long API pulls fail intermittently — resilience must be layered
+During the 2022 NY ingestion (~120K rows in), the Medicaid API hit a read
+timeout that escaped the original exception handling (TimeoutError at the
+socket level, outside requests' exception hierarchy) and crashed the run.
+Fixes applied: timeout 60s→120s, retries 4→5 (backoff to 16s), exception
+net widened to include TimeoutError/OSError.
+Partition-level idempotency allowed recovery by simply re-running: completed
+states (CA, TX) were skipped; only NY re-fetched.
+→ Implication: two resilience layers are needed — request-level retries
+   inside scripts, task-level retries in the orchestrator (Airflow).
+   Long batch jobs additionally need checkpointing (applied later in the
+   RxNav resolver: progress saved every 500 lookups, resumable).
+
+## 10. FDA NDC Directory alone identifies 87.9% of volume — with recency bias
+Joining SDUD (2020–2023, CA/TX/NY) to the FDA NDC Directory on a
+normalized 9-digit key (zero-padded labeler+product, package code dropped):
+- 67.6% of distinct ndc9 codes matched, but 87.9% of prescription volume
+  → unmatched codes skew low-volume
+- Match rate by year climbs monotonically: 82.5% (2020) → 86.2% → 89.5%
+  → 93.3% (2023)
+- Top unmatched NDCs are discontinued products (e.g. Flovent HFA, ProAir
+  HFA) and specific manufacturers' exited generic lines (diclofenac,
+  metformin, amlodipine) — active, million-prescription products through
+  2023 that have since been delisted from the directory.
+→ Implication: the FDA directory only reflects currently marketed drugs;
+   historical claims data requires a historical dictionary. Also note
+   NDC format mismatch (SDUD: 11 digits no dashes; FDA: dashed, unpadded)
+   requires key normalization before any join.
+
+## 11. RxNorm historical resolution closes the gap: >99.99% coverage
+The 8,560 FDA-unmatched ndc9 codes were batch-resolved via RxNav's
+ndcstatus API (checkpointed, rate-limited, resumable): 8,532 (99.7%)
+resolved to an RxCUI concept — RxNorm retains mappings for OBSOLETE codes
+(e.g. ProAir NDC 59310-0579: status OBSOLETE, still resolves to
+"albuterol 0.09 MG/ACTUAT Metered Dose Inhaler [ProAir]", with full
+active-date history 2012–2025).
+Combined dictionary (FDA + RxNav): 100.0% of prescription volume matched
+in every year (2020–2023) at 2-decimal precision; 28 negligible-volume
+codes remain
+
+## 12 (short version):
+ "Crosswalk names come from two sources with incompatible styles (FDA salt-level generic names vs RxNav verbose concept strings), splitting some drugs' volume across rows — e.g. albuterol's FDA-matched NDCs vs ProAir's RxNav-resolved ones. Ingredient-level normalization via RxNorm is required before aggregation is trustworthy."
