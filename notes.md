@@ -104,5 +104,45 @@ Combined dictionary (FDA + RxNav): 100.0% of prescription volume matched
 in every year (2020–2023) at 2-decimal precision; 28 negligible-volume
 codes remain
 
-## 12 (short version):
- "Crosswalk names come from two sources with incompatible styles (FDA salt-level generic names vs RxNav verbose concept strings), splitting some drugs' volume across rows — e.g. albuterol's FDA-matched NDCs vs ProAir's RxNav-resolved ones. Ingredient-level normalization via RxNorm is required before aggregation is trustworthy."
+## 12. Crosswalk names come from two incompatible naming styles — volume splits
+The crosswalk's drug_name column mixes two source vocabularies:
+- FDA rows: salt-level generic names ("albuterol sulfate", "metformin
+  hydrochloride", "amlodipine besylate")
+- RxNav rows: verbose clinical concept strings ("NDA021457 200 ACTUAT
+  albuterol 0.09 MG/ACTUAT Metered Dose Inhaler [ProAir]")
+These never group together, so a single molecule's volume splits across
+rows — e.g. albuterol's FDA-matched NDCs (20.95M rx) sat apart from
+ProAir's RxNav-resolved NDCs (1.6M+ rx). With ~12% of total volume
+flowing through RxNav-sourced rows, the split is material, not cosmetic.
+Salt-form naming adds a second, smaller splitting axis on the FDA side.
+→ Implication: name-level aggregation is untrustworthy; identity must be
+   normalized to the molecule (RxNorm ingredient) level before any
+   aggregation or modeling.
+
+## 13. Ingredient-level normalization: 5,081 name variants merged;
+##     naive aggregation understates top drugs by 13–38%
+Method: RxNav /rxcui/{id}/related?tty=IN lookup for rxnav-sourced rows
+(3,690 distinct rxcuis, checkpointed batch job); conservative salt/ester
+suffix stripping for FDA generic names, with combo drugs split per
+component and sorted for stable identity.
+Results:
+- 22,832 distinct drug_name strings → 17,751 molecule-level ingredients
+  (5,081 variants merged); only 3 of 142,919 crosswalk rows left without
+  an ingredient.
+- Volume corrections at the top of the distribution (4yr, CA/TX/NY):
+    albuterol      20.95M → 23.77M rx  (+13%)
+    atorvastatin   15.35M → 19.14M rx  (+25%)
+    fluticasone    10.57M → 14.62M rx  (+38%)
+  i.e. skipping NDC/ingredient resolution understates leading drugs'
+  demand by 13–38% — quantifying the cost of the naive approach most
+  prior SDUD analyses take.
+- Fragmentation extreme: levothyroxine = 372 NDC codes, 31 name variants,
+  now one entity.
+Caveats: ~10% of rxcuis returned no RxNorm IN concept (kits, packs, some
+biologics) and fell back to source names; salt/ester stripping is
+deliberately conservative (under-strips rather than risking merging
+distinct molecules), and merges ester distinctions like fluticasone
+propionate/furoate at molecule level — acceptable for demand forecasting,
+noted as a limitation.
+→ Implication: the `ingredient` column in ndc_crosswalk_enriched.parquet
+   is the canonical forecasting entity: (state, ingredient, quarter).
