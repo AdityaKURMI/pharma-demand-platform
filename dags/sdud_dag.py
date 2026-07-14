@@ -26,7 +26,7 @@ from airflow import DAG
 from airflow.providers.standard.operators.bash import BashOperator
 
 REPO = "/opt/airflow/repo"
-YEARS = "2020 2021 2022 2023"
+YEARS = "2018 2019 2020 2021 2022 2023"
 STATES = "CA TX NY"
 
 default_args = {
