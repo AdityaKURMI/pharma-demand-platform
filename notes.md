@@ -282,3 +282,36 @@ excluded as artifact.)
    +99% in the years after each drug's "first generic approval" — patent
    settlements make the approval-to-launch gap the decisive variable.
    Gross-price caveat (pre-rebate) applies throughout.
+## 23. LOE regime features do not help the global demand model (outcome c)
+Final pre-freeze experiment, pre-committed interpretations: A5a (frozen
+best GBM) vs A6 (= A5a + generic_entry_occurred + quarters_since_entry,
+leakage-guarded via clip-at-zero). Same rebuilt panel, same folds/seed.
+  Overall MASE: A5a 1.080 -> A6 1.104 (degradation)
+  Entry-adjacent slice (+/-4q of observed entry): n=9 predictions across
+  6 series — insufficient sample to evaluate; not interpreted.
+Mechanism (branch c): features are constant zero for 1,427/1,448 series;
+tree splits on them add noise exceeding any benefit to the 21 LOE-aware
+series. With only 7 observed entry events in a 3-state panel, regime
+features are too sparse for a global model to exploit.
+→ Paper framing: honest null connecting the two chapters — "LOE-derived
+   regime features, evaluated under pre-committed criteria, did not
+   improve demand forecasts at this event density; larger panels (more
+   states, longer history) are the path to testing this properly."
+   ALL NUMBERS FROZEN as of this experiment.
+
+## 23. LOE regime features do not help the global demand model (outcome c)
+Final pre-freeze experiment, pre-committed interpretations: A5a (frozen
+best GBM) vs A6 (= A5a + generic_entry_occurred + quarters_since_entry,
+leakage-guarded via clip-at-zero). Same rebuilt panel, same folds/seed.
+  Overall MASE: A5a 1.080 -> A6 1.104 (degradation)
+  Entry-adjacent slice (+/-4q of observed entry): n=9 predictions across
+  6 series — insufficient sample to evaluate; not interpreted.
+Mechanism (branch c): features are constant zero for 1,427/1,448 series;
+tree splits on them add noise exceeding any benefit to the 21 LOE-aware
+series. With only 7 observed entry events in a 3-state panel, regime
+features are too sparse for a global model to exploit.
+→ Paper framing: honest null connecting the two chapters — "LOE-derived
+   regime features, evaluated under pre-committed criteria, did not
+   improve demand forecasts at this event density; larger panels (more
+   states, longer history) are the path to testing this properly."
+   ALL NUMBERS FROZEN as of this experiment.
