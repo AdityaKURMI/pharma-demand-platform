@@ -146,3 +146,107 @@ propionate/furoate at molecule level — acceptable for demand forecasting,
 noted as a limitation.
 → Implication: the `ingredient` column in ndc_crosswalk_enriched.parquet
    is the canonical forecasting entity: (state, ingredient, quarter).
+
+## 14. COVID structural shock at panel start (albuterol case)
+Albuterol/CA: Q1-2020 spike to 863K rx (+55% vs following quarter) — 
+stockpiling + COVID respiratory use — then crash to 558K in Q2-2020 
+(lockdowns, collapsed physician visits) and multi-year recovery through 
+2022. n_ndc11_codes drifts ~55 → ~75 over the panel (manufacturer churn).
+→ Implication: the panel begins with a once-in-a-century demand shock; 
+   forecasting evaluation must account for 2020 explicitly (covid_shock 
+   feature; later confirmed better handled by down-weighting 2020 in 
+   training — see #17).
+
+## 15. Headline benchmark: 4 models, 4 rolling-origin folds (2023), 
+##     1,448 series, metrics on original scale
+  model            MASE    sMAPE
+  naive            1.077   15.29
+  seasonal_naive   1.411   22.01
+  ets              0.983   14.35   <- only model beating seasonal-naive
+  lgbm_global      1.114   15.86
+Target: log1p(prescriptions); global LGBM with lags/rolling/seasonal/
+covid features + state/ingredient categoricals; ETS = per-series 
+Holt-Winters. Seasonal-naive's poor MASE (1.411) vs plain naive (1.077) 
+shows quarterly Medicaid demand is persistence/trend-dominated, not 
+seasonality-dominated.
+
+## 16. 2023 = growth cessation + elevated volatility (unwinding partial)
+Total panel volume: 2022 grows smoothly 45.2M → 53.2M rx/quarter; 2023 
+oscillates 52.2 → 48.1 → 52.9 → 48.5M (±8% quarter-to-quarter swings, 
+no sustained trend). Medicaid unwinding (continuous-enrollment protection 
+ended 2023-03-31) is a plausible partial driver of the Q2-2023 dip and 
+level plateau, but the full Q3 rebound rules out a monotone-decline 
+narrative. Per-fold errors confirm whipsaw: naive over-predicts Q2 dip 
+(fold1), under-predicts Q3 rebound (fold2: 1.306), over-predicts Q4 dip 
+(fold3: 1.309).
+→ Implication: the test period's volatility — not a clean regime shift — 
+   is what degraded all models; honest framing beats the tidy story.
+
+## 17. Benchmark verdict + ablations: per-series ETS beats global GBM
+Reference ETS = 0.983. Ablations (one change at a time):
+  A0 baseline               1.114
+  A1 drop ingredient cat    1.181  (hurts — ingredient carries signal)
+  A2 small model            1.099  (mild help; big help fold0)
+  A3 down-weight 2020 @0.2  1.083  (best single change)
+  A4 momentum features      1.165  (helps only fold1; noise elsewhere)
+  A5a = A2+A3               1.080  (best GBM; frozen final config)
+  A5b = A5a+momentum        1.095  (best GBM fold1 = 1.245 — trend 
+                                    features help exactly at the regime 
+                                    break, cost elsewhere)
+GBM deficit concentrates in fold1 (Q2-2023 volatility onset). Effects 
+don't compose linearly (original A5 combo: 1.194).
+→ Paper conclusion: with short panels (24 quarters) and mid-test 
+   structural volatility, classical per-series trend-tracking retains 
+   the edge; global GBMs need explicit regime features and pay for them 
+   in stable periods. Table frozen — no post-hoc configuration fishing.
+
+## 18. Volume-tier slice: ETS's edge is largest where it matters most
+MASE by volume tier (bottom 50% / 50-90% / top 10% of series volume):
+  tier          small    mid   large
+  ets           0.906  1.077   0.995
+  lgbm_global   0.960  1.250   1.345
+  naive         0.894  1.225   1.403
+Hypothesis "global pooling helps large drugs": REJECTED — GBM is worst 
+on the large tier (1.345, barely above naive), while ETS holds ~1.0. 
+Likely mechanism: high-volume series have idiosyncratic dynamics 
+(formulary shifts, generic entry, 2023 choppiness); pooling shrinks 
+predictions toward cross-series average behavior exactly when a series 
+moves individually. Small drugs are stable/flat — everything forecasts 
+them adequately.
+→ Commercially decisive: large drugs are what pharma analytics teams 
+   care about, and that's precisely where the per-series approach wins.
+
+## 19. First-ANDA-approval is a structurally noisy LOE proxy — the
+##     approval-to-launch gap splits the cohort
+Of 134 Orange Book LOE candidates (first generic approval 2019–2022,
+incumbent brand predating window), 19 carried >= 10K rx/quarter pre-LOE
+in the CA/TX/NY panel. Per-drug price-erosion fits split the cohort in two:
+- LAUNCHED generics — genuine erosion: pregabalin/Lyrica (rate 0.96/q,
+  floor 0.10 — ~90% gross price collapse), lacosamide/Vimpat (floor 0.15),
+  sevelamer (0.56), etonogestrel ring (0.59), ciprofloxacin;dexamethasone.
+- APPROVED-BUT-UNLAUNCHED — no erosion, prices continued RISING: apixaban/
+  Eliquis (floor 1.16; generics approved 2019, launch delayed to ~2028 by
+  patent settlements), empagliflozin/Jardiance (1.40), linagliptin (1.50).
+  Plus one proxy artifact: methylphenidate (decades-old generics; a new
+  formulation's ANDA masqueraded as first generic entry at molecule level).
+Pooled fit across the mixed cohort is meaningless (implied floor 87.9%) —
+it averages a cliff with an uphill slope.
+→ Implications: (1) ANDA approval != market entry; patent-settlement
+   delays make the gap structural, not random noise. Analyses using
+   approval dates uncritically conflate two populations. (2) Correct
+   anchor = OBSERVED generic entry in utilization data itself (requires
+   brand/generic NDC tagging via openFDA application_number — next step).
+   (3) The unlaunched cohort is retained as a named contrast group;
+   its continued price inflation is a result, not a nuisance.
+
+## 20. Brands raise prices into the patent cliff (pre-LOE inflation)
+Event-time price index (anchored to t=-4..-1 mean) sits BELOW 1.0 in
+earlier pre-LOE quarters: t=-8..-5 means of 0.908/0.939/0.921/0.904 vs
+~1.0 at t=-1 — i.e. gross cost-per-prescription rose ~10-13% over the
+two years approaching first generic approval, across the 19-event cohort.
+Consistent with documented brand pricing behavior ahead of exclusivity
+loss ("harvest pricing").
+→ Caveat for both #19/#20: SDUD amounts are pre-rebate; brand rebates are
+   large and confidential, so gross-price levels overstate net prices and
+   measured erosion magnitude is a lower bound on net erosion. Curve
+   SHAPE and TIMING remain informative.
