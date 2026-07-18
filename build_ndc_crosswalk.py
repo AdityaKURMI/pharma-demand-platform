@@ -1,23 +1,24 @@
 """
-Phase 2, Step 3: Build the NDC crosswalk — one authoritative row per ndc9.
+Phase 2, Step 3 (v2): Build the NDC crosswalk — one authoritative row per ndc9.
+
+v2 additions (LOE chapter): carries marketing_category + application_number
+from the FDA directory and derives a brand_generic flag:
+  - FDA rows:   marketing_category ANDA -> generic; NDA/BLA -> brand
+  - RxNav rows: RxNorm embeds the application number at the start of the
+    concept name (e.g. "NDA021457 200 ACTUAT albuterol ... [ProAir]"),
+    so a prefix regex classifies historical codes too
+  - everything else (OTC monograph, unapproved) -> 'other'
 
 Combines two dictionaries with source priority:
   1. FDA NDC Directory (richer structured fields) — deduplicated:
-     prefer latest marketing_start, tie-break on having a generic_name
+     prefer rows with a generic_name, then latest marketing_start
   2. RxNav historical resolution (covers retired codes FDA dropped)
 
-Every downstream query joins SDUD -> this crosswalk to get drug identity.
-
 Output: data/reference/ndc_crosswalk/ndc_crosswalk.parquet
-  ndc9         9-digit normalized NDC key (labeler+product)
-  drug_name    best available drug name (FDA generic_name, else RxNav concept)
-  brand_name   FDA brand name where available
-  dosage_form  FDA dosage form where available
-  route        FDA route where available
-  rxcui        RxNorm concept id where available (RxNav-sourced rows)
-  source       'fda' | 'rxnav' — provenance of the identity
 
 Run: python build_ndc_crosswalk.py
+NOTE: requires ingest_fda_ndc.py re-run first with the v2 fields
+      (marketing_category, application_number) captured.
 """
 
 from pathlib import Path
@@ -37,9 +38,9 @@ def main() -> None:
     con.execute(f"""
         COPY (
             WITH fda_deduped AS (
-                -- 2,403 duplicate ndc9 keys exist (re-registrations, multiple
-                -- marketing periods). Rule: latest marketing_start wins;
-                -- tie-break: rows that actually have a generic_name.
+                -- Duplicate ndc9 keys exist (re-registrations, multiple
+                -- marketing periods). Rule: rows that actually have a
+                -- generic_name win; tie-break latest marketing_start.
                 SELECT *
                 FROM (
                     SELECT *,
@@ -66,6 +67,16 @@ def main() -> None:
                 f.dosage_form                            AS dosage_form,
                 f.route                                  AS route,
                 r.rxcui                                  AS rxcui,
+                f.marketing_category                     AS marketing_category,
+                f.application_number                     AS application_number,
+                CASE
+                    WHEN f.marketing_category ILIKE 'ANDA%' THEN 'generic'
+                    WHEN f.marketing_category ILIKE 'NDA%'
+                      OR f.marketing_category ILIKE 'BLA%' THEN 'brand'
+                    WHEN regexp_matches(r.concept_name, '^ANDA') THEN 'generic'
+                    WHEN regexp_matches(r.concept_name, '^NDA')  THEN 'brand'
+                    ELSE 'other'
+                END                                      AS brand_generic,
                 CASE WHEN f.ndc9 IS NOT NULL THEN 'fda' ELSE 'rxnav' END AS source
             FROM fda_deduped f
             FULL OUTER JOIN rxnav_hits r USING (ndc9)
@@ -76,16 +87,23 @@ def main() -> None:
     stats = con.execute(f"""
         SELECT
             source,
-            COUNT(*)                                   AS n_rows,
+            COUNT(*)                                           AS n_rows,
             SUM(CASE WHEN drug_name IS NULL THEN 1 ELSE 0 END) AS n_missing_name
         FROM '{OUT}'
         GROUP BY source ORDER BY source
+    """).df()
+    flag_stats = con.execute(f"""
+        SELECT brand_generic, COUNT(*) AS n_rows
+        FROM '{OUT}'
+        GROUP BY brand_generic ORDER BY n_rows DESC
     """).df()
     total, dupes = con.execute(f"""
         SELECT COUNT(*), COUNT(*) - COUNT(DISTINCT ndc9) FROM '{OUT}'
     """).fetchone()
 
-    print(stats.to_string())
+    print(stats.to_string(index=False))
+    print("\nbrand_generic distribution:")
+    print(flag_stats.to_string(index=False))
     print(f"\nTotal crosswalk rows: {total:,}  (duplicate ndc9 keys: {dupes} — must be 0)")
     print(f"Saved -> {OUT}")
 

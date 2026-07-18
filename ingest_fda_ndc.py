@@ -86,6 +86,8 @@ def main() -> None:
             "marketing_start": rec.get("marketing_start_date"),
             "marketing_end": rec.get("marketing_end_date"),
             "labeler_name": rec.get("labeler_name"),
+            "marketing_category": rec.get("marketing_category"),
+            "application_number": rec.get("application_number"),
         })
 
     df = pd.DataFrame(rows)

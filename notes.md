@@ -250,3 +250,35 @@ loss ("harvest pricing").
    large and confidential, so gross-price levels overstate net prices and
    measured erosion magnitude is a lower bound on net erosion. Curve
    SHAPE and TIMING remain informative.
+
+## 21. Corrected erosion (observed-entry anchor): depth tracks penetration
+Launched cohort after v2 re-anchoring (generic share >= 10% observed in
+data, >= 4q runway, >= 10K rx/q): 7 molecules (down from 19 — the
+observed-entry filter correctly ejected approved-but-unlaunched events).
+Central result: price-floor depth tracks generic penetration depth:
+  - Full genericization -> deep erosion: pregabalin/Lyrica (share_end
+    0.93, floor 0.094 — ~90% collapse, half-life 0.7q), lacosamide
+    (0.85 -> 0.23), varenicline (0.92 -> 0.81, instantaneous — Chantix
+    brand recall 2021 made this a recall-driven quasi-LOE; footnoted)
+  - Partial genericization -> shallow erosion: etonogestrel ring
+    (share_end 0.33, floor 0.85), cipro;dexamethasone (0.30 -> 0.83)
+  - Two flagged bad fits: atropine (price ROSE post-entry; documented
+    shortage-era pricing) and glucagon (transient share crossing, share
+    retreated 0.28 -> 0.16; likely authorized-generic blip)
+Median trajectory (trimmed to t in [-8,+12], n>=4): ~1.0 pre-entry ->
+~0.83 within 2 quarters -> ~0.76 by +8.
+Presentation rule: lead with median trajectory + per-drug curves; the
+pooled parametric fit (floor 69.4%) is distorted by cohort heterogeneity
+at n=7 and is not headline material. Small-n stated plainly.
+
+## 22. Unlaunched contrast: approved-but-unlaunched brands nearly doubled
+Nine candidate molecules never crossed 10% generic share in-panel
+(volume-filtered). Price ratio, last panel year vs first:
+empagliflozin/Jardiance 2.15, apixaban/Eliquis 1.99, linaclotide 1.95,
+linagliptin 1.89, brexpiprazole 1.57, budesonide;formoterol 1.50,
+cariprazine 1.32, fluticasone;salmeterol 1.13. (IV-solution row 0.40
+excluded as artifact.)
+→ The single-chart story of the LOE chapter: pregabalin -90% vs apixaban
+   +99% in the years after each drug's "first generic approval" — patent
+   settlements make the approval-to-launch gap the decisive variable.
+   Gross-price caveat (pre-rebate) applies throughout.
